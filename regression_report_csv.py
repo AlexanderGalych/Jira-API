@@ -60,6 +60,8 @@ STATUSES_OPEN = ', '.join('"{0}"'.format(w) for w in [STATUSES['Open'], STATUSES
                                                       STATUSES['In_Progress'], STATUSES['Rejected']])
 STATUSES_REJECTED_CLOSED = ', '.join('"{0}"'.format(w)
                                      for w in [STATUSES['Resolved'], STATUSES['Closed'], STATUSES['Rejected']])
+STATUSES_FIXED_CLOSED = ', '.join('"{0}"'.format(w) for w in [STATUSES['Resolved'], STATUSES['Closed'],
+                                                              STATUSES['Fixed_staging'], STATUSES['Fixed_production']])
 STATUSES_CLOSED = ', '.join('"{0}"'.format(w) for w in [STATUSES['Resolved'], STATUSES['Closed']])
 
 
@@ -112,17 +114,18 @@ def get_total_opened_bugs(jira):
               'AND status NOT IN (%STATUSES%) AND fixVersion = "%VERSION%"'
     query = pattern.replace('%PROJECT%', PARAMS['project'])\
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
-                   .replace('%STATUSES%', STATUSES_CLOSED)\
+                   .replace('%STATUSES%', STATUSES_FIXED_CLOSED)\
                    .replace('%VERSION%', PARAMS['fixed_version'])
     RESULT['Total opened bugs'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
 
 
 # Get bug that was reported during last 24h ( last day).
 def get_bugs_reported_during_last_day(jira):
-    pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" ' \
+    pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" AND fixVersion = "%VERSION%" ' \
               'AND created >= "%CREATED_START%" AND created <= "%CREATED_END%"'
     query = pattern.replace('%PROJECT%', PARAMS['project'])\
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
+                   .replace('%VERSION%', PARAMS['fixed_version'])\
                    .replace('%CREATED_START%', get_calculation_prev_day_date())\
                    .replace('%CREATED_END%', PARAMS['calculation_date'])
     RESULT['Bug that was reported during last 24h ( last day)'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
@@ -171,16 +174,17 @@ def get_fixed_bugs(jira):
 # Get bugs that were resolved during last 24h.
 def get_bugs_resolved_during_last_day(jira):
     pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" AND status IN (%STATUSES%) ' \
-              'AND resolved >= "%RESOLVED_START%" AND resolved <= "%RESOLVED_END%"'
+              'AND resolved >= "%RESOLVED_START%" AND resolved <= "%RESOLVED_END%" AND fixVersion = "%VERSION%"'
     query = pattern.replace('%PROJECT%', PARAMS['project'])\
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
                    .replace('%STATUSES%', STATUSES_CLOSED)\
+                   .replace('%VERSION%', PARAMS['fixed_version'])\
                    .replace('%RESOLVED_START%', get_calculation_prev_day_date())\
                    .replace('%RESOLVED_END%', PARAMS['calculation_date'])
     RESULT['Resolved during last 24h'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
-    return
 
 
+# Get bugs without fixed version.
 def get_bugs_without_fixed_version(jira):
     pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" ' \
               'AND fixVersion is %VERSION% AND status NOT IN (%STATUSES%)'
