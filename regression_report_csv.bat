@@ -1,4 +1,5 @@
 REM __author__ = 'alex.galych'
+REM __author__ = 'oleg.rudnev'
 @ECHO OFF
 
 REM Required:
