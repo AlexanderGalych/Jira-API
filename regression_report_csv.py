@@ -24,6 +24,7 @@ RESULT = OrderedDict([
     ('Priority. Urgent', 'N/A'),
     ('Priority. Now', 'N/A'),
     ('Fixed bugs', 'N/A'),
+    ('Fixed bugs since start iteration', 'N/A'),
     ('Resolved during last 24h', 'N/A'),
     ('Unversioned bugs', 'N/A')
 ])
@@ -52,6 +53,7 @@ BUG_PRIORITIES = {
     'Now': 'Now',
 }
 MAX_RESULT = 300
+ISSUE_FIELDS = 'key'
 ISSUE_TYPE = 'Bug Report'
 EMPTY_FIX_VERSION = 'EMPTY'
 
@@ -91,6 +93,11 @@ def connect_to_jira():
     return connection
 
 
+# Get count of jira issues.
+def get_jira_found_issues_count(jira, query):
+    return len(jira.search_issues(query, maxResults=MAX_RESULT, fields=ISSUE_FIELDS))
+
+
 # Get calculation_date previous day date (-24hour).
 def get_calculation_prev_day_date():
     return (datetime.datetime.strptime(PARAMS['calculation_date'], DATE_FORMAT)
@@ -105,7 +112,7 @@ def get_total_open_bugs_before_testing(jira):
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
                    .replace('%STATUSES%', STATUSES_REJECTED_CLOSED)\
                    .replace('%DATE%', PARAMS['iteration_start_date'])
-    RESULT['Total opened bugs before testing'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+    RESULT['Total opened bugs before testing'] = get_jira_found_issues_count(jira, query)
 
 
 # Get total opened bugs.
@@ -116,7 +123,7 @@ def get_total_opened_bugs(jira):
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
                    .replace('%STATUSES%', STATUSES_FIXED_CLOSED)\
                    .replace('%VERSION%', PARAMS['fixed_version'])
-    RESULT['Total opened bugs'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+    RESULT['Total opened bugs'] = get_jira_found_issues_count(jira, query)
 
 
 # Get bug that was reported during last 24h ( last day).
@@ -128,7 +135,7 @@ def get_bugs_reported_during_last_day(jira):
                    .replace('%VERSION%', PARAMS['fixed_version'])\
                    .replace('%CREATED_START%', get_calculation_prev_day_date())\
                    .replace('%CREATED_END%', PARAMS['calculation_date'])
-    RESULT['Bug that was reported during last 24h ( last day)'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+    RESULT['Bug that was reported during last 24h ( last day)'] = get_jira_found_issues_count(jira, query)
 
 
 # Get backend, frontend and other bugs.
@@ -142,7 +149,7 @@ def get_bugs_by_type(jira, bug_type):
                    .replace('%STATUSES%', STATUSES_CLOSED)\
                    .replace('%VERSION%', PARAMS['fixed_version'])\
                    .replace('%BUG_TYPE_CONDITION%', condition)
-    RESULT[bug_type + ' bugs'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+    RESULT[bug_type + ' bugs'] = get_jira_found_issues_count(jira, query)
 
 
 # Get bugs by priority.
@@ -154,21 +161,20 @@ def get_bugs_by_priority(jira, bug_priority):
                    .replace('%STATUSES%', STATUSES_CLOSED)\
                    .replace('%VERSION%', PARAMS['fixed_version'])\
                    .replace('%BUG_PRIORITY%', bug_priority)
-    RESULT['Priority. ' + bug_priority] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+    RESULT['Priority. ' + bug_priority] = get_jira_found_issues_count(jira, query)
 
 
-# Get fixed bugs.
-def get_fixed_bugs(jira):
-    pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" AND status NOT IN (%NOT_IN_STATUSES%) ' \
-              'AND status changed to "%STATUS%" DURING (%RANGE%) AND fixVersion = "%VERSION%"'
-    date_range = ', '.join('"{0}"'.format(w) for w in [get_calculation_prev_day_date(), PARAMS['calculation_date']])
+# Get fixed bugs by range.
+def get_fixed_bugs_by_range(jira, from_date, key):
+    pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" AND status IN (%STATUSES%) ' \
+              'AND fixVersion = "%VERSION%" AND status was in (%OLD_STATUSES%) DURING (%RANGE%)'
     query = pattern.replace('%PROJECT%', PARAMS['project'])\
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
-                   .replace('%STATUS%', STATUSES['Fixed_staging'])\
-                   .replace('%NOT_IN_STATUSES%', STATUSES_OPEN)\
-                   .replace('%RANGE%', date_range)\
-                   .replace('%VERSION%', PARAMS['fixed_version'])
-    RESULT['Fixed bugs'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+                   .replace('%STATUSES%', STATUSES_FIXED_CLOSED)\
+                   .replace('%VERSION%', PARAMS['fixed_version'])\
+                   .replace('%OLD_STATUSES%', STATUSES_OPEN)\
+                   .replace('%RANGE%', ', '.join('"{0}"'.format(w) for w in [from_date, PARAMS['calculation_date']]))
+    RESULT[key] = get_jira_found_issues_count(jira, query)
 
 
 # Get bugs that were resolved during last 24h.
@@ -181,7 +187,7 @@ def get_bugs_resolved_during_last_day(jira):
                    .replace('%VERSION%', PARAMS['fixed_version'])\
                    .replace('%RESOLVED_START%', get_calculation_prev_day_date())\
                    .replace('%RESOLVED_END%', PARAMS['calculation_date'])
-    RESULT['Resolved during last 24h'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+    RESULT['Resolved during last 24h'] = get_jira_found_issues_count(jira, query)
 
 
 # Get bugs without fixed version.
@@ -192,7 +198,7 @@ def get_bugs_without_fixed_version(jira):
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
                    .replace('%VERSION%', EMPTY_FIX_VERSION)\
                    .replace('%STATUSES%', STATUSES_CLOSED)
-    RESULT['Unversioned bugs'] = len(jira.search_issues(query, maxResults=MAX_RESULT))
+    RESULT['Unversioned bugs'] = get_jira_found_issues_count(jira, query)
 
 
 # Write result to csv file.
@@ -222,7 +228,12 @@ def main():
         for priority in BUG_PRIORITIES:
             get_bugs_by_priority(jira, priority)
 
-        get_fixed_bugs(jira)
+        # get fixed (last 24h)
+        get_fixed_bugs_by_range(jira, get_calculation_prev_day_date(), 'Fixed bugs')
+
+        # get fixed bugs since start iteration.
+        get_fixed_bugs_by_range(jira, PARAMS['iteration_start_date'], 'Fixed bugs since start iteration')
+
         get_bugs_resolved_during_last_day(jira)
         get_bugs_without_fixed_version(jira)
 
