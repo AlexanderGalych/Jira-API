@@ -58,8 +58,8 @@ ISSUE_TYPE = 'Bug Report'
 EMPTY_FIX_VERSION = 'EMPTY'
 
 # bug statuses combination.
-STATUSES_OPEN = ', '.join('"{0}"'.format(w) for w in [STATUSES['Open'], STATUSES['Reopened'], STATUSES['Feedback'],
-                                                      STATUSES['In_Progress'], STATUSES['Rejected']])
+STATUSES_OPEN = ', '.join('"{0}"'.format(w) for w in [STATUSES['Rejected'], STATUSES['Reopened'], STATUSES['Feedback'],
+                                                      STATUSES['In_Progress'], STATUSES['Open'], STATUSES['Blocked']])
 STATUSES_REJECTED_CLOSED = ', '.join('"{0}"'.format(w)
                                      for w in [STATUSES['Resolved'], STATUSES['Closed'], STATUSES['Rejected']])
 STATUSES_FIXED_CLOSED = ', '.join('"{0}"'.format(w) for w in [STATUSES['Resolved'], STATUSES['Closed'],
@@ -166,13 +166,16 @@ def get_bugs_by_priority(jira, bug_priority):
 
 # Get fixed bugs by range.
 def get_fixed_bugs_by_range(jira, from_date, key):
-    pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" AND status IN (%STATUSES%) ' \
-              'AND fixVersion = "%VERSION%" AND status was in (%OLD_STATUSES%) DURING (%RANGE%)'
+    pattern = 'project = "%PROJECT%" AND type = "%ISSUE_TYPE%" AND fixVersion = "%VERSION%" AND ' \
+              '(status changed to "%FIXED_STAGING%" DURING (%RANGE%) OR ' \
+              'status changed to "%FIXED_PRODUCTION%" DURING (%RANGE%)) AND ' \
+              'status was in (%NOT_IN_STATUSES%) DURING (%RANGE%) AND status not in (%NOT_IN_STATUSES%)'
     query = pattern.replace('%PROJECT%', PARAMS['project'])\
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
-                   .replace('%STATUSES%', STATUSES_FIXED_CLOSED)\
                    .replace('%VERSION%', PARAMS['fixed_version'])\
-                   .replace('%OLD_STATUSES%', STATUSES_OPEN)\
+                   .replace('%FIXED_STAGING%', STATUSES['Fixed_staging'])\
+                   .replace('%FIXED_PRODUCTION%', STATUSES['Fixed_production'])\
+                   .replace('%NOT_IN_STATUSES%', STATUSES_OPEN)\
                    .replace('%RANGE%', ', '.join('"{0}"'.format(w) for w in [from_date, PARAMS['calculation_date']]))
     RESULT[key] = get_jira_found_issues_count(jira, query)
 
