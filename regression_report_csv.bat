@@ -12,10 +12,11 @@ set FIXED_VERSION="Iteration"
 
 REM Optional:
 set CALCULATION_DATE=
+set CALCULATION_DATE_24_HOUR_START=
 set CSV_FILE_NAME=
 
 REM python script attributes.
-set PARAMS=--server=%SERVER% --project=%PROJECT% --name=%NAME% --password=%PASSWORD% --iteration_start_date=%START_DATE% --fixed_version=%FIXED_VERSION%
+set PARAMS=--server=%SERVER% --project=%PROJECT% --name=%NAME% --password=%PASSWORD% --iteration_start_date=%START_DATE% --fixed_version=%FIXED_VERSION% --calculation_date_start=%CALCULATION_DATE_24_HOUR_START%
 
 REM add calculation_date to script attributes.
 IF defined CALCULATION_DATE (

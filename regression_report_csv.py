@@ -9,7 +9,8 @@ from jira.client import JIRA
 DATE_FORMAT = "%Y-%m-%d %H:%M"
 PARAMS = {
     'server': '', 'name': '', 'password': '', 'project': '', 'iteration_start_date': '', 'fixed_version': '',
-    'calculation_date': datetime.datetime.now().strftime(DATE_FORMAT), 'csv_file_name': 'result'
+    'calculation_date': datetime.datetime.now().strftime(DATE_FORMAT), 'csv_file_name': 'result',
+    'calculation_date_start': datetime.datetime.now().strftime(DATE_FORMAT)
 }
 RESULT = OrderedDict([
     ('Total opened bugs before testing', 'N/A'),
@@ -39,7 +40,8 @@ STATUSES = {
     'Fixed_locally': "Fixed locally",
     'Fixed_staging': "Fixed on staging",
     'Fixed_production': "Fixed on production",
-    'Blocked': "Blocked"
+    'Blocked': "Blocked",
+    'Hold': "On hold"
 }
 BUG_TYPES = {
     'Backend': 'Backend',
@@ -59,7 +61,8 @@ EMPTY_FIX_VERSION = 'EMPTY'
 
 # bug statuses combination.
 STATUSES_OPEN = ', '.join('"{0}"'.format(w) for w in [STATUSES['Rejected'], STATUSES['Reopened'], STATUSES['Feedback'],
-                                                      STATUSES['In_Progress'], STATUSES['Open'], STATUSES['Blocked']])
+                                                      STATUSES['In_Progress'], STATUSES['Open'], STATUSES['Blocked'],
+                                                      STATUSES['Fixed_locally'], STATUSES['Hold']])
 STATUSES_REJECTED_CLOSED = ', '.join('"{0}"'.format(w)
                                      for w in [STATUSES['Resolved'], STATUSES['Closed'], STATUSES['Rejected']])
 STATUSES_FIXED_CLOSED = ', '.join('"{0}"'.format(w) for w in [STATUSES['Resolved'], STATUSES['Closed'],
@@ -98,11 +101,11 @@ def get_jira_found_issues_count(jira, query):
     return len(jira.search_issues(query, maxResults=MAX_RESULT, fields=ISSUE_FIELDS))
 
 
-# Get calculation_date previous day date (-24hour).
-def get_calculation_prev_day_date():
-    return (datetime.datetime.strptime(PARAMS['calculation_date'], DATE_FORMAT)
-            - datetime.timedelta(days=1)).strftime(DATE_FORMAT)
-
+# Calculate previous calculation day date (-24hour) if it not defined.
+def calculate_prev_day_date():
+    if PARAMS['calculation_date_start'] == datetime.datetime.now().strftime(DATE_FORMAT):
+        PARAMS['calculation_date_start'] = (datetime.datetime.strptime(PARAMS['calculation_date'], DATE_FORMAT) -
+                                            datetime.timedelta(days=1)).strftime(DATE_FORMAT)
 
 # Get total opened bugs before testing.
 def get_total_open_bugs_before_testing(jira):
@@ -121,7 +124,7 @@ def get_total_opened_bugs(jira):
               'AND status NOT IN (%STATUSES%) AND fixVersion = "%VERSION%"'
     query = pattern.replace('%PROJECT%', PARAMS['project'])\
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
-                   .replace('%STATUSES%', STATUSES_FIXED_CLOSED)\
+                   .replace('%STATUSES%', STATUSES_CLOSED)\
                    .replace('%VERSION%', PARAMS['fixed_version'])
     RESULT['Total opened bugs'] = get_jira_found_issues_count(jira, query)
 
@@ -133,7 +136,7 @@ def get_bugs_reported_during_last_day(jira):
     query = pattern.replace('%PROJECT%', PARAMS['project'])\
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
                    .replace('%VERSION%', PARAMS['fixed_version'])\
-                   .replace('%CREATED_START%', get_calculation_prev_day_date())\
+                   .replace('%CREATED_START%', PARAMS['calculation_date_start'])\
                    .replace('%CREATED_END%', PARAMS['calculation_date'])
     RESULT['Bug that was reported during last 24h ( last day)'] = get_jira_found_issues_count(jira, query)
 
@@ -188,7 +191,7 @@ def get_bugs_resolved_during_last_day(jira):
                    .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
                    .replace('%STATUSES%', STATUSES_CLOSED)\
                    .replace('%VERSION%', PARAMS['fixed_version'])\
-                   .replace('%RESOLVED_START%', get_calculation_prev_day_date())\
+                   .replace('%RESOLVED_START%', PARAMS['calculation_date_start'])\
                    .replace('%RESOLVED_END%', PARAMS['calculation_date'])
     RESULT['Resolved during last 24h'] = get_jira_found_issues_count(jira, query)
 
@@ -218,6 +221,7 @@ def main():
         get_command_line_params()
         validate_command_line_params()
         jira = connect_to_jira()
+        calculate_prev_day_date()
 
         # get data from jira.
         get_total_open_bugs_before_testing(jira)
@@ -232,7 +236,7 @@ def main():
             get_bugs_by_priority(jira, priority)
 
         # get fixed (last 24h)
-        get_fixed_bugs_by_range(jira, get_calculation_prev_day_date(), 'Fixed bugs')
+        get_fixed_bugs_by_range(jira, PARAMS['calculation_date_start'], 'Fixed bugs')
 
         # get fixed bugs since start iteration.
         get_fixed_bugs_by_range(jira, PARAMS['iteration_start_date'], 'Fixed bugs since start iteration')
