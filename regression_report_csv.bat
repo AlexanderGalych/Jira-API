@@ -16,7 +16,7 @@ set CALCULATION_DATE_24_HOUR_START=
 set CSV_FILE_NAME=
 
 REM python script attributes.
-set PARAMS=--server=%SERVER% --project=%PROJECT% --name=%NAME% --password=%PASSWORD% --iteration_start_date=%START_DATE% --fixed_version=%FIXED_VERSION% --calculation_date_start=%CALCULATION_DATE_24_HOUR_START%
+set PARAMS=--server=%SERVER% --project=%PROJECT% --name=%NAME% --password=%PASSWORD% --iteration_start_date=%START_DATE% --fixed_version=%FIXED_VERSION%
 
 REM add calculation_date to script attributes.
 IF defined CALCULATION_DATE (
@@ -26,6 +26,11 @@ IF defined CALCULATION_DATE (
 REM add csv_file_name to script attributes.
 IF defined CSV_FILE_NAME (
     set PARAMS=%PARAMS% --csv_file_name=%CSV_FILE_NAME%
+)
+
+REM add calculation_date_start to script attributes.
+IF defined CALCULATION_DATE_24_HOUR_START (
+    set PARAMS=%PARAMS% --calculation_date_start=%CALCULATION_DATE_24_HOUR_START%
 )
 
 ECHO Automation of QA Regression metrics reports start...
