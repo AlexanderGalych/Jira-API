@@ -27,7 +27,8 @@ RESULT = OrderedDict([
     ('Fixed bugs', 'N/A'),
     ('Fixed bugs since start iteration', 'N/A'),
     ('Resolved during last 24h', 'N/A'),
-    ('Unversioned bugs', 'N/A')
+    ('Unversioned bugs', 'N/A'),
+    ('Bugs left out developers', 'N/A')
 ])
 STATUSES = {
     'Open': "Open",
@@ -36,11 +37,16 @@ STATUSES = {
     'Resolved': "Resolved",
     'Closed': "Closed",
     'Feedback': "Feedback required",
+    'Feedback_available': "Feedback available",
     'Rejected': "Rejected",
+    # 'Rejected_approved': "Rejected approved",
+    'Rejected_approved': "Resolved",
+    'QA': "QA",
+    # 'Verify_rejection': "Verify rejection",
+    'Verify_rejection': "QA",
     'Fixed_locally': "Fixed locally",
     'Fixed_staging': "Fixed on staging",
     'Fixed_production': "Fixed on production",
-    'Blocked': "Blocked",
     'Hold': "On hold"
 }
 BUG_TYPES = {
@@ -60,14 +66,19 @@ ISSUE_TYPE = 'Bug Report'
 EMPTY_FIX_VERSION = 'EMPTY'
 
 # bug statuses combination.
+STATUSES_DEV_OPEN = ', '.join('"{0}"'.format(w) for w in [STATUSES['Rejected'], STATUSES['Reopened'], STATUSES['Feedback'],
+                                                      STATUSES['Feedback_available'], STATUSES['In_Progress'], STATUSES['Open'],
+                                                      STATUSES['Fixed_locally'], STATUSES['Hold']])
+
 STATUSES_OPEN = ', '.join('"{0}"'.format(w) for w in [STATUSES['Rejected'], STATUSES['Reopened'], STATUSES['Feedback'],
-                                                      STATUSES['In_Progress'], STATUSES['Open'], STATUSES['Blocked'],
+                                                      STATUSES['Feedback_available'], STATUSES['QA'], STATUSES['Verify_rejection'],
+                                                      STATUSES['In_Progress'], STATUSES['Open'],
                                                       STATUSES['Fixed_locally'], STATUSES['Hold']])
 STATUSES_REJECTED_CLOSED = ', '.join('"{0}"'.format(w)
-                                     for w in [STATUSES['Resolved'], STATUSES['Closed'], STATUSES['Rejected']])
+                                     for w in [STATUSES['Resolved'], STATUSES['Closed'], STATUSES['Rejected_approved']])
 STATUSES_FIXED_CLOSED = ', '.join('"{0}"'.format(w) for w in [STATUSES['Resolved'], STATUSES['Closed'],
                                                               STATUSES['Fixed_staging'], STATUSES['Fixed_production']])
-STATUSES_CLOSED = ', '.join('"{0}"'.format(w) for w in [STATUSES['Resolved'], STATUSES['Closed']])
+STATUSES_CLOSED = ', '.join('"{0}"'.format(w) for w in [STATUSES['Resolved'], STATUSES['Closed'], STATUSES['Rejected_approved']])
 
 
 # Retrieve params from command line arguments.
@@ -206,6 +217,15 @@ def get_bugs_without_fixed_version(jira):
                    .replace('%STATUSES%', STATUSES_CLOSED)
     RESULT['Unversioned bugs'] = get_jira_found_issues_count(jira, query)
 
+# Get bugs on developers.
+def get_bugs_left_out_developers(jira):
+    pattern = 'project = "%PROJECT%" AND issuetype = "%ISSUE_TYPE%" ' \
+              'AND status IN (%STATUSES%) AND fixVersion = "%VERSION%"'
+    query = pattern.replace('%PROJECT%', PARAMS['project'])\
+                   .replace('%ISSUE_TYPE%', ISSUE_TYPE)\
+                   .replace('%STATUSES%', STATUSES_DEV_OPEN)\
+                   .replace('%VERSION%', PARAMS['fixed_version'])
+    RESULT['Bugs left out developers'] = get_jira_found_issues_count(jira, query)
 
 # Write result to csv file.
 def write_to_csv():
@@ -243,6 +263,7 @@ def main():
 
         get_bugs_resolved_during_last_day(jira)
         get_bugs_without_fixed_version(jira)
+        get_bugs_left_out_developers(jira)
 
         # write data to file.
         write_to_csv()
